@@ -72,7 +72,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/session").permitAll()
-                        .requestMatchers("/api/v1/reports/**", "/api/v1/purchase-planning/**", "/api/v1/test/owner-only").hasRole("OWNER")
+                        .requestMatchers(
+                                "/api/v1/reports/**",
+                                "/api/v1/purchase-planning/**",
+                                "/api/v1/purchase-targets/**",
+                                "/api/v1/test/owner-only"
+                        ).hasRole("OWNER")
                         .requestMatchers(
                                 "/api/v1/operations/**",
                                 "/api/v1/test/operational",
