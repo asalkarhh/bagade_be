@@ -19,4 +19,33 @@ public interface SkuRepository extends JpaRepository<Sku, UUID>, SkuSearchReposi
 
     @Query("SELECT s FROM Sku s JOIN FETCH s.product WHERE s.id IN :ids")
     List<Sku> findAllByIdWithProduct(@Param("ids") Collection<UUID> ids);
+
+    @Query("""
+            SELECT s FROM Sku s
+            JOIN FETCH s.product p
+            WHERE (s.active = true OR EXISTS (
+                SELECT bb.id FROM BatchBalance bb
+                JOIN bb.batch b
+                WHERE b.sku.id = s.id
+                  AND bb.stockCondition = com.bagade.inventory.entity.StockCondition.SELLABLE
+                  AND bb.quantity > 0
+            ))
+            ORDER BY p.name ASC, s.skuCode ASC, s.id ASC
+            """)
+    List<Sku> findCountableSkusForShop();
+
+    @Query("""
+            SELECT s FROM Sku s
+            JOIN FETCH s.product p
+            WHERE p.category.id IN :categoryIds
+              AND (s.active = true OR EXISTS (
+                SELECT bb.id FROM BatchBalance bb
+                JOIN bb.batch b
+                WHERE b.sku.id = s.id
+                  AND bb.stockCondition = com.bagade.inventory.entity.StockCondition.SELLABLE
+                  AND bb.quantity > 0
+            ))
+            ORDER BY p.name ASC, s.skuCode ASC, s.id ASC
+            """)
+    List<Sku> findCountableSkusForCategories(@Param("categoryIds") Collection<UUID> categoryIds);
 }

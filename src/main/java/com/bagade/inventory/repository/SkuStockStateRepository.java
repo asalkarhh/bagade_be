@@ -15,6 +15,8 @@ import java.util.UUID;
 @Repository
 public interface SkuStockStateRepository extends JpaRepository<SkuStockState, UUID> {
 
+    List<SkuStockState> findBySkuIdIn(Collection<UUID> skuIds);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM SkuStockState s WHERE s.skuId IN :skuIds ORDER BY s.skuId ASC")
     List<SkuStockState> findBySkuIdInOrderBySkuIdAscForUpdate(@Param("skuIds") Collection<UUID> skuIds);

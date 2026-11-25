@@ -37,7 +37,7 @@ public class SaleAllocationReversal {
     @Column(nullable = false)
     private int quantity;
 
-    @Column(name = "captured_unit_cost", nullable = false, precision = 12, scale = 2)
+    @Column(name = "captured_unit_cost", precision = 12, scale = 2)
     private BigDecimal capturedUnitCost;
 
     @Enumerated(EnumType.STRING)

@@ -34,7 +34,7 @@ class FlywayMigrationCleanDatabaseTest {
         var migrateResult = flyway.migrate();
 
         assertThat(migrateResult.success).isTrue();
-        assertThat(migrateResult.migrationsExecuted).isEqualTo(6);
+        assertThat(migrateResult.migrationsExecuted).isEqualTo(7);
 
         List<String> tables = jdbcTemplate.queryForList(
                 "SELECT table_name FROM information_schema.tables " +
@@ -46,7 +46,8 @@ class FlywayMigrationCleanDatabaseTest {
                         "'stock_movement', 'sku_stock_state', 'barcode_mapping', " +
                         "'customer', 'bill', 'bill_revision', 'bill_line', " +
                         "'billing_event', 'billing_event_line', 'sale_allocation', 'payment_entry', " +
-                        "'sales_adjustment', 'sale_allocation_reversal'" +
+                        "'sales_adjustment', 'sale_allocation_reversal', " +
+                        "'stock_count', 'stock_count_line', 'expense'" +
                         ")",
                 String.class
         );
@@ -77,7 +78,10 @@ class FlywayMigrationCleanDatabaseTest {
                 "sale_allocation",
                 "payment_entry",
                 "sales_adjustment",
-                "sale_allocation_reversal"
+                "sale_allocation_reversal",
+                "stock_count",
+                "stock_count_line",
+                "expense"
         );
 
         List<String> barcodeIndexes = jdbcTemplate.queryForList(
@@ -89,10 +93,10 @@ class FlywayMigrationCleanDatabaseTest {
         Integer movementCols = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.columns " +
                         "WHERE table_schema = 'public' AND table_name = 'stock_movement' " +
-                        "AND column_name IN ('source_sale_allocation_id', 'source_sale_allocation_reversal_id')",
+                        "AND column_name IN ('source_sale_allocation_id', 'source_sale_allocation_reversal_id', 'source_stock_count_line_id', 'allocation_basis')",
                 Integer.class
         );
-        assertThat(movementCols).isEqualTo(2);
+        assertThat(movementCols).isEqualTo(4);
 
         Integer seqCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.sequences " +
@@ -146,10 +150,10 @@ class FlywayMigrationCleanDatabaseTest {
                 poId, skuId
         );
 
-        // Upgrade to latest (V6)
+        // Upgrade to latest (V7)
         var upgradeResult = flyway.migrate();
         assertThat(upgradeResult.success).isTrue();
-        assertThat(upgradeResult.migrationsExecuted).isEqualTo(3);
+        assertThat(upgradeResult.migrationsExecuted).isEqualTo(4);
 
         // Verify BE03 data preserved and sku_stock_state backfilled
         assertThat(jdbcTemplate.queryForObject(
@@ -226,10 +230,10 @@ class FlywayMigrationCleanDatabaseTest {
                 movementId, batchId, receiptLineId, userId
         );
 
-        // Upgrade to latest (V6)
+        // Upgrade to latest (V7)
         var upgradeResult = flyway.migrate();
         assertThat(upgradeResult.success).isTrue();
-        assertThat(upgradeResult.migrationsExecuted).isEqualTo(2);
+        assertThat(upgradeResult.migrationsExecuted).isEqualTo(3);
 
         // Verify BE04 balances and movements preserved and BE05/BE06 schema created
         assertThat(jdbcTemplate.queryForObject(
@@ -343,10 +347,10 @@ class FlywayMigrationCleanDatabaseTest {
                 movementId, batchId, allocId, userId
         );
 
-        // Upgrade to V6
+        // Upgrade to V7
         var upgradeResult = flyway.migrate();
         assertThat(upgradeResult.success).isTrue();
-        assertThat(upgradeResult.migrationsExecuted).isEqualTo(1);
+        assertThat(upgradeResult.migrationsExecuted).isEqualTo(2);
 
         // Verify BE06 backfill on existing BE05 records
         assertThat(jdbcTemplate.queryForObject(
@@ -370,6 +374,73 @@ class FlywayMigrationCleanDatabaseTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT reversed_quantity FROM sale_allocation WHERE id = ?", Integer.class, allocId
         )).isEqualTo(0);
+
+        flyway.clean();
+        flyway.migrate();
+    }
+
+    @Test
+    @DisplayName("Flyway upgrades an existing BE06 database to BE07 and preserves posted batches and billing history")
+    void flywayUpgradesBe06DatabaseToBe07AndPreservesHistory() {
+        flyway.clean();
+
+        // Apply V1..V6 (BE01..BE06)
+        Flyway be06Flyway = Flyway.configure()
+                .dataSource(dataSource)
+                .locations("classpath:db/migration")
+                .target("6")
+                .cleanDisabled(false)
+                .load();
+        var v6Result = be06Flyway.migrate();
+        assertThat(v6Result.success).isTrue();
+        assertThat(v6Result.migrationsExecuted).isEqualTo(6);
+
+        UUID userId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO user_account (id, username, display_name, password_hash, role, active) VALUES (?, 'be06_owner', 'Owner', '$2a$10$dummyhash', 'OWNER', true)",
+                userId
+        );
+        UUID categoryId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO category (id, name) VALUES (?, 'Sarees')", categoryId);
+        jdbcTemplate.update("INSERT INTO product (id, category_id, name) VALUES (?, ?, 'Tussar Saree')", productId, categoryId);
+        jdbcTemplate.update(
+                "INSERT INTO sku (id, product_id, sku_code, size, default_selling_price, active) VALUES (?, ?, 'TSR-6', null, 4200.00, true)",
+                skuId, productId
+        );
+        jdbcTemplate.update("INSERT INTO sku_stock_state (sku_id, stock_version) VALUES (?, 1)", skuId);
+        UUID vendorId = UUID.randomUUID();
+        UUID receiptId = UUID.randomUUID();
+        UUID receiptLineId = UUID.randomUUID();
+        UUID batchId = UUID.randomUUID();
+        jdbcTemplate.update("INSERT INTO vendor (id, name, created_by) VALUES (?, 'Weavers', ?)", vendorId, userId);
+        jdbcTemplate.update(
+                "INSERT INTO stock_receipt (id, receipt_number, vendor_id, received_date, posted_by) VALUES (?, 'RCP-000099', ?, CURRENT_DATE, ?)",
+                receiptId, vendorId, userId
+        );
+        jdbcTemplate.update(
+                "INSERT INTO stock_receipt_line (id, stock_receipt_id, line_number, sku_id, quantity, unit_cost) VALUES (?, ?, 0, ?, 4, 2900.00)",
+                receiptLineId, receiptId, skuId
+        );
+        jdbcTemplate.update(
+                "INSERT INTO stock_batch (id, sku_id, stock_receipt_line_id, received_date, unit_cost) VALUES (?, ?, ?, CURRENT_DATE, 2900.00)",
+                batchId, skuId, receiptLineId
+        );
+        jdbcTemplate.update("INSERT INTO batch_balance (batch_id, stock_condition, quantity) VALUES (?, 'SELLABLE', 4)", batchId);
+
+        // Upgrade to V7
+        var upgradeResult = flyway.migrate();
+        assertThat(upgradeResult.success).isTrue();
+        assertThat(upgradeResult.migrationsExecuted).isEqualTo(1);
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT batch_source FROM stock_batch WHERE id = ?", String.class, batchId
+        )).isEqualTo("RECEIPT");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('stock_count', 'stock_count_line', 'expense')",
+                Integer.class
+        )).isEqualTo(3);
 
         flyway.clean();
         flyway.migrate();

@@ -86,7 +86,9 @@ public class SecurityConfig {
                                 "/api/v1/barcodes/**",
                                 "/api/v1/stock-batches/**",
                                 "/api/v1/customers/**",
-                                "/api/v1/bills/**"
+                                "/api/v1/bills/**",
+                                "/api/v1/stock-counts/**",
+                                "/api/v1/expenses/**"
                         ).hasAnyRole("OWNER", "WORKER")
                         .requestMatchers("/api/v1/auth/session").authenticated()
                         .anyRequest().authenticated()

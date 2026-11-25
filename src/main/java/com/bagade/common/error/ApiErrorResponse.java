@@ -10,13 +10,24 @@ public record ApiErrorResponse(
         String requestId,
         List<FieldErrorItem> fieldErrors,
         List<SelectableBatchDetail> selectableBatches,
-        BillTotalsSnapshot currentTotals
+        BillTotalsSnapshot currentTotals,
+        List<ChangedStockSkuDetail> changedSkus
 ) {
     public ApiErrorResponse(String code, String message, String requestId) {
-        this(code, message, requestId, null, null, null);
+        this(code, message, requestId, null, null, null, null);
     }
 
     public ApiErrorResponse(String code, String message, String requestId, List<FieldErrorItem> fieldErrors) {
-        this(code, message, requestId, fieldErrors, null, null);
+        this(code, message, requestId, fieldErrors, null, null, null);
+    }
+
+    public ApiErrorResponse(
+            String code,
+            String message,
+            String requestId,
+            List<FieldErrorItem> fieldErrors,
+            List<SelectableBatchDetail> selectableBatches,
+            BillTotalsSnapshot currentTotals) {
+        this(code, message, requestId, fieldErrors, selectableBatches, currentTotals, null);
     }
 }

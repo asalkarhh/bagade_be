@@ -7,14 +7,17 @@ import com.bagade.inventory.entity.MovementType;
 import com.bagade.inventory.entity.SkuStockState;
 import com.bagade.inventory.entity.StockBatch;
 import com.bagade.inventory.entity.StockCondition;
+import com.bagade.inventory.entity.StockCountLine;
 import com.bagade.inventory.entity.StockMovement;
 import com.bagade.inventory.entity.StockReceiptLine;
 import com.bagade.inventory.repository.BatchBalanceRepository;
 import com.bagade.inventory.repository.SkuStockStateRepository;
+import com.bagade.inventory.repository.StockBatchRepository;
 import com.bagade.inventory.repository.StockMovementRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -30,14 +33,17 @@ public class InventoryMovementService {
 
     private final SkuStockStateRepository skuStockStateRepository;
     private final BatchBalanceRepository batchBalanceRepository;
+    private final StockBatchRepository stockBatchRepository;
     private final StockMovementRepository stockMovementRepository;
 
     public InventoryMovementService(
             SkuStockStateRepository skuStockStateRepository,
             BatchBalanceRepository batchBalanceRepository,
+            StockBatchRepository stockBatchRepository,
             StockMovementRepository stockMovementRepository) {
         this.skuStockStateRepository = skuStockStateRepository;
         this.batchBalanceRepository = batchBalanceRepository;
+        this.stockBatchRepository = stockBatchRepository;
         this.stockMovementRepository = stockMovementRepository;
     }
 
@@ -134,5 +140,48 @@ public class InventoryMovementService {
                 actorUserId
         ));
         return newQty;
+    }
+
+    public int recordAuditShortageDeduction(
+            BatchBalance sellableBalance,
+            int deductedQuantity,
+            StockCountLine countLine,
+            Instant postedAt,
+            UUID actorUserId) {
+        int newQty = sellableBalance.getQuantity() - deductedQuantity;
+        if (newQty < 0) {
+            throw new IllegalStateException("Batch balance would become negative for batch " + sellableBalance.getBatch().getId());
+        }
+        sellableBalance.setQuantity(newQty);
+        stockMovementRepository.save(StockMovement.forStockCountAdjustment(
+                sellableBalance.getBatch(),
+                -deductedQuantity,
+                countLine,
+                "FIFO_SHORTAGE",
+                postedAt,
+                actorUserId
+        ));
+        return newQty;
+    }
+
+    public StockBatch recordAuditSurplus(
+            StockCountLine countLine,
+            int surplusQuantity,
+            LocalDate auditDate,
+            Instant postedAt,
+            UUID actorUserId) {
+        StockBatch surplusBatch = stockBatchRepository.saveAndFlush(
+                StockBatch.auditSurplus(countLine.getSku(), countLine, auditDate)
+        );
+        batchBalanceRepository.save(new BatchBalance(surplusBatch, StockCondition.SELLABLE, surplusQuantity));
+        stockMovementRepository.save(StockMovement.forStockCountAdjustment(
+                surplusBatch,
+                surplusQuantity,
+                countLine,
+                "AUDIT_SURPLUS",
+                postedAt,
+                actorUserId
+        ));
+        return surplusBatch;
     }
 }

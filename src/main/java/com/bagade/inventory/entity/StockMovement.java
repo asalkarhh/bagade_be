@@ -43,6 +43,13 @@ public class StockMovement {
     @JoinColumn(name = "source_sale_allocation_reversal_id")
     private SaleAllocationReversal sourceSaleAllocationReversal;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_stock_count_line_id")
+    private StockCountLine sourceStockCountLine;
+
+    @Column(name = "allocation_basis", length = 40)
+    private String allocationBasis;
+
     @Column(name = "posted_at", nullable = false, updatable = false)
     private Instant postedAt;
 
@@ -134,6 +141,37 @@ public class StockMovement {
                 postedAt,
                 postedBy
         );
+    }
+
+    public static StockMovement forStockCountAdjustment(
+            StockBatch batch,
+            int quantityDelta,
+            StockCountLine sourceStockCountLine,
+            String allocationBasis,
+            Instant postedAt,
+            UUID postedBy) {
+        StockMovement movement = new StockMovement(
+                batch,
+                StockCondition.SELLABLE,
+                MovementType.ADJUSTMENT,
+                quantityDelta,
+                null,
+                null,
+                null,
+                postedAt,
+                postedBy
+        );
+        movement.sourceStockCountLine = sourceStockCountLine;
+        movement.allocationBasis = allocationBasis;
+        return movement;
+    }
+
+    public StockCountLine getSourceStockCountLine() {
+        return sourceStockCountLine;
+    }
+
+    public String getAllocationBasis() {
+        return allocationBasis;
     }
 
     public SaleAllocationReversal getSourceSaleAllocationReversal() {

@@ -184,6 +184,32 @@ public class GlobalExceptionHandler {
                 .body(new ApiErrorResponse("PAYMENT_EXCEEDS_BALANCE", ex.getMessage(), requestId));
     }
 
+    @ExceptionHandler(StockChangedException.class)
+    public ResponseEntity<ApiErrorResponse> handleStockChanged(
+            StockChangedException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Stock changed conflict: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse(
+                        "STOCK_CHANGED",
+                        ex.getMessage(),
+                        requestId,
+                        null,
+                        null,
+                        null,
+                        ex.getChangedSkus()
+                ));
+    }
+
+    @ExceptionHandler(StockCountAlreadyPostedException.class)
+    public ResponseEntity<ApiErrorResponse> handleStockCountAlreadyPosted(
+            StockCountAlreadyPostedException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Stock count already posted: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("STOCK_COUNT_POSTED", ex.getMessage(), requestId));
+    }
+
     @ExceptionHandler({
             StaleVersionException.class,
             ObjectOptimisticLockingFailureException.class,

@@ -21,14 +21,22 @@ public class StockBatch {
     @JoinColumn(name = "sku_id", nullable = false)
     private Sku sku;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "stock_receipt_line_id", nullable = false, unique = true)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "stock_receipt_line_id", unique = true)
     private StockReceiptLine stockReceiptLine;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "batch_source", nullable = false, length = 30)
+    private BatchSource batchSource = BatchSource.RECEIPT;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_stock_count_line_id")
+    private StockCountLine sourceStockCountLine;
 
     @Column(name = "received_date", nullable = false)
     private LocalDate receivedDate;
 
-    @Column(name = "unit_cost", nullable = false, precision = 12, scale = 2)
+    @Column(name = "unit_cost", precision = 12, scale = 2)
     private BigDecimal unitCost;
 
     @Column(name = "printed_mrp", precision = 12, scale = 2)
@@ -48,10 +56,35 @@ public class StockBatch {
             BigDecimal printedMrp) {
         this.sku = sku;
         this.stockReceiptLine = stockReceiptLine;
+        this.batchSource = BatchSource.RECEIPT;
         this.receivedDate = receivedDate;
         this.unitCost = unitCost;
         this.printedMrp = printedMrp;
         this.createdAt = Instant.now();
+    }
+
+    public static StockBatch auditSurplus(
+            Sku sku,
+            StockCountLine sourceStockCountLine,
+            LocalDate receivedDate) {
+        StockBatch batch = new StockBatch();
+        batch.sku = sku;
+        batch.stockReceiptLine = null;
+        batch.batchSource = BatchSource.AUDIT_SURPLUS;
+        batch.sourceStockCountLine = sourceStockCountLine;
+        batch.receivedDate = receivedDate;
+        batch.unitCost = null;
+        batch.printedMrp = null;
+        batch.createdAt = Instant.now();
+        return batch;
+    }
+
+    public BatchSource getBatchSource() {
+        return batchSource;
+    }
+
+    public StockCountLine getSourceStockCountLine() {
+        return sourceStockCountLine;
     }
 
     public UUID getId() {
