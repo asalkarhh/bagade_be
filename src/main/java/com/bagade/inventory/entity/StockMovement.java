@@ -1,5 +1,7 @@
 package com.bagade.inventory.entity;
 
+import com.bagade.billing.entity.SaleAllocation;
+import com.bagade.billing.entity.SaleAllocationReversal;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -33,6 +35,14 @@ public class StockMovement {
     @JoinColumn(name = "source_receipt_line_id")
     private StockReceiptLine sourceReceiptLine;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_sale_allocation_id")
+    private SaleAllocation sourceSaleAllocation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_sale_allocation_reversal_id")
+    private SaleAllocationReversal sourceSaleAllocationReversal;
+
     @Column(name = "posted_at", nullable = false, updatable = false)
     private Instant postedAt;
 
@@ -50,13 +60,84 @@ public class StockMovement {
             StockReceiptLine sourceReceiptLine,
             Instant postedAt,
             UUID postedBy) {
+        this(batch, stockCondition, movementType, quantityDelta, sourceReceiptLine, null, null, postedAt, postedBy);
+    }
+
+    public StockMovement(
+            StockBatch batch,
+            StockCondition stockCondition,
+            MovementType movementType,
+            int quantityDelta,
+            StockReceiptLine sourceReceiptLine,
+            SaleAllocation sourceSaleAllocation,
+            Instant postedAt,
+            UUID postedBy) {
+        this(batch, stockCondition, movementType, quantityDelta, sourceReceiptLine, sourceSaleAllocation, null, postedAt, postedBy);
+    }
+
+    public StockMovement(
+            StockBatch batch,
+            StockCondition stockCondition,
+            MovementType movementType,
+            int quantityDelta,
+            StockReceiptLine sourceReceiptLine,
+            SaleAllocation sourceSaleAllocation,
+            SaleAllocationReversal sourceSaleAllocationReversal,
+            Instant postedAt,
+            UUID postedBy) {
         this.batch = batch;
         this.stockCondition = stockCondition;
         this.movementType = movementType;
         this.quantityDelta = quantityDelta;
         this.sourceReceiptLine = sourceReceiptLine;
+        this.sourceSaleAllocation = sourceSaleAllocation;
+        this.sourceSaleAllocationReversal = sourceSaleAllocationReversal;
         this.postedAt = postedAt;
         this.postedBy = postedBy;
+    }
+
+    public static StockMovement forSale(
+            StockBatch batch,
+            int allocatedQuantity,
+            SaleAllocation saleAllocation,
+            Instant postedAt,
+            UUID postedBy) {
+        return new StockMovement(
+                batch,
+                StockCondition.SELLABLE,
+                MovementType.SALE,
+                -allocatedQuantity,
+                null,
+                saleAllocation,
+                null,
+                postedAt,
+                postedBy
+        );
+    }
+
+    public static StockMovement forSaleReversal(
+            StockBatch batch,
+            StockCondition stockCondition,
+            MovementType movementType,
+            int reversedQuantity,
+            SaleAllocationReversal reversal,
+            Instant postedAt,
+            UUID postedBy) {
+        return new StockMovement(
+                batch,
+                stockCondition,
+                movementType,
+                reversedQuantity,
+                null,
+                null,
+                reversal,
+                postedAt,
+                postedBy
+        );
+    }
+
+    public SaleAllocationReversal getSourceSaleAllocationReversal() {
+        return sourceSaleAllocationReversal;
     }
 
     public UUID getId() {
@@ -81,6 +162,10 @@ public class StockMovement {
 
     public StockReceiptLine getSourceReceiptLine() {
         return sourceReceiptLine;
+    }
+
+    public SaleAllocation getSourceSaleAllocation() {
+        return sourceSaleAllocation;
     }
 
     public Instant getPostedAt() {

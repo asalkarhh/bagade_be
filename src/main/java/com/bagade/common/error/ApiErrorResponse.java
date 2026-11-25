@@ -8,9 +8,15 @@ public record ApiErrorResponse(
         String code,
         String message,
         String requestId,
-        List<FieldErrorItem> fieldErrors
+        List<FieldErrorItem> fieldErrors,
+        List<SelectableBatchDetail> selectableBatches,
+        BillTotalsSnapshot currentTotals
 ) {
     public ApiErrorResponse(String code, String message, String requestId) {
-        this(code, message, requestId, null);
+        this(code, message, requestId, null, null, null);
+    }
+
+    public ApiErrorResponse(String code, String message, String requestId, List<FieldErrorItem> fieldErrors) {
+        this(code, message, requestId, fieldErrors, null, null);
     }
 }

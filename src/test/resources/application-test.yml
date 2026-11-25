@@ -28,6 +28,7 @@ server:
 app:
   shop:
     name: ${APP_SHOP_NAME:Bagade Clothing}
+    timezone: ${APP_SHOP_TIMEZONE:Asia/Kolkata}
   first-owner:
     username: ${APP_FIRST_OWNER_USERNAME:}
     password: ${APP_FIRST_OWNER_PASSWORD:}

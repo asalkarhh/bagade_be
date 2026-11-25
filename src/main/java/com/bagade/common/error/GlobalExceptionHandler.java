@@ -116,6 +116,74 @@ public class GlobalExceptionHandler {
                 .body(new ApiErrorResponse("LABEL_NOT_FOUND", ex.getMessage(), requestId));
     }
 
+    @ExceptionHandler(BatchSelectionRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleBatchSelectionRequired(
+            BatchSelectionRequiredException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Batch selection required: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse(
+                        "BATCH_SELECTION_REQUIRED",
+                        ex.getMessage(),
+                        requestId,
+                        null,
+                        ex.getSelectableBatches(),
+                        null
+                ));
+    }
+
+    @ExceptionHandler(PriceChangedException.class)
+    public ResponseEntity<ApiErrorResponse> handlePriceChanged(
+            PriceChangedException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Price changed: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse(
+                        "PRICE_CHANGED",
+                        ex.getMessage(),
+                        requestId,
+                        null,
+                        null,
+                        ex.getCurrentTotals()
+                ));
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ApiErrorResponse> handleInsufficientStock(
+            InsufficientStockException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Insufficient stock: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("INSUFFICIENT_STOCK", ex.getMessage(), requestId));
+    }
+
+    @ExceptionHandler(ReturnQuantityExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleReturnQuantityExceeded(
+            ReturnQuantityExceededException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Return quantity exceeded: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("RETURN_QUANTITY_EXCEEDED", ex.getMessage(), requestId));
+    }
+
+    @ExceptionHandler(BillCancelledException.class)
+    public ResponseEntity<ApiErrorResponse> handleBillCancelled(
+            BillCancelledException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Bill already cancelled: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("BILL_CANCELLED", ex.getMessage(), requestId));
+    }
+
+    @ExceptionHandler(PaymentExceedsBalanceException.class)
+    public ResponseEntity<ApiErrorResponse> handlePaymentExceedsBalance(
+            PaymentExceedsBalanceException ex, HttpServletRequest request) {
+        String requestId = RequestIdFilter.getRequestId(request);
+        log.warn("[{}] Payment exceeds balance due: {}", requestId, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse("PAYMENT_EXCEEDS_BALANCE", ex.getMessage(), requestId));
+    }
+
     @ExceptionHandler({
             StaleVersionException.class,
             ObjectOptimisticLockingFailureException.class,

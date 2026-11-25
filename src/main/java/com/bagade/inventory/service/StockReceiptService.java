@@ -15,19 +15,12 @@ import com.bagade.inventory.dto.StockReceiptLineResponse;
 import com.bagade.inventory.dto.StockReceiptResponse;
 import com.bagade.inventory.entity.BarcodeMapping;
 import com.bagade.inventory.entity.BarcodeSourceType;
-import com.bagade.inventory.entity.BatchBalance;
-import com.bagade.inventory.entity.MovementType;
 import com.bagade.inventory.entity.SkuStockState;
 import com.bagade.inventory.entity.StockBatch;
-import com.bagade.inventory.entity.StockCondition;
-import com.bagade.inventory.entity.StockMovement;
 import com.bagade.inventory.entity.StockReceipt;
 import com.bagade.inventory.entity.StockReceiptLine;
 import com.bagade.inventory.repository.BarcodeMappingRepository;
-import com.bagade.inventory.repository.BatchBalanceRepository;
-import com.bagade.inventory.repository.SkuStockStateRepository;
 import com.bagade.inventory.repository.StockBatchRepository;
-import com.bagade.inventory.repository.StockMovementRepository;
 import com.bagade.inventory.repository.StockReceiptRepository;
 import com.bagade.purchasing.entity.PurchaseOrder;
 import com.bagade.purchasing.entity.PurchaseOrderLine;
@@ -61,15 +54,13 @@ public class StockReceiptService {
 
     private final StockReceiptRepository stockReceiptRepository;
     private final StockBatchRepository stockBatchRepository;
-    private final BatchBalanceRepository batchBalanceRepository;
-    private final StockMovementRepository stockMovementRepository;
-    private final SkuStockStateRepository skuStockStateRepository;
     private final BarcodeMappingRepository barcodeMappingRepository;
     private final VendorRepository vendorRepository;
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseOrderLineRepository purchaseOrderLineRepository;
     private final SkuRepository skuRepository;
     private final IdempotencyService idempotencyService;
+    private final InventoryMovementService inventoryMovementService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -77,26 +68,22 @@ public class StockReceiptService {
     public StockReceiptService(
             StockReceiptRepository stockReceiptRepository,
             StockBatchRepository stockBatchRepository,
-            BatchBalanceRepository batchBalanceRepository,
-            StockMovementRepository stockMovementRepository,
-            SkuStockStateRepository skuStockStateRepository,
             BarcodeMappingRepository barcodeMappingRepository,
             VendorRepository vendorRepository,
             PurchaseOrderRepository purchaseOrderRepository,
             PurchaseOrderLineRepository purchaseOrderLineRepository,
             SkuRepository skuRepository,
-            IdempotencyService idempotencyService) {
+            IdempotencyService idempotencyService,
+            InventoryMovementService inventoryMovementService) {
         this.stockReceiptRepository = stockReceiptRepository;
         this.stockBatchRepository = stockBatchRepository;
-        this.batchBalanceRepository = batchBalanceRepository;
-        this.stockMovementRepository = stockMovementRepository;
-        this.skuStockStateRepository = skuStockStateRepository;
         this.barcodeMappingRepository = barcodeMappingRepository;
         this.vendorRepository = vendorRepository;
         this.purchaseOrderRepository = purchaseOrderRepository;
         this.purchaseOrderLineRepository = purchaseOrderLineRepository;
         this.skuRepository = skuRepository;
         this.idempotencyService = idempotencyService;
+        this.inventoryMovementService = inventoryMovementService;
     }
 
     @Transactional
@@ -177,7 +164,7 @@ public class StockReceiptService {
             throw new RequestValidationException("Validation failed", skuErrors);
         }
 
-        List<SkuStockState> lockedStockStates = lockOrInitializeStockStates(sortedSkuIds);
+        List<SkuStockState> lockedStockStates = inventoryMovementService.lockOrInitializeStockStates(sortedSkuIds);
 
         if (po == null) {
             var postSkuLockReplay = idempotencyService.findReplay(
@@ -244,16 +231,13 @@ public class StockReceiptService {
             ));
             batchesByReceiptLineId.put(savedLine.getId(), batch);
 
-            batchBalanceRepository.save(new BatchBalance(batch, StockCondition.SELLABLE, savedLine.getQuantity()));
-            stockMovementRepository.save(new StockMovement(
+            inventoryMovementService.recordReceipt(
                     batch,
-                    StockCondition.SELLABLE,
-                    MovementType.RECEIPT,
                     savedLine.getQuantity(),
                     savedLine,
                     postedAt,
                     actorUserId
-            ));
+            );
 
             if (Boolean.TRUE.equals(lineReq.generateInternalTag())) {
                 String code = String.format("BGD%08d", barcodeMappingRepository.nextInternalBarcodeSequence());
@@ -285,9 +269,7 @@ public class StockReceiptService {
             po.touchUpdatedAt();
         }
 
-        for (SkuStockState state : lockedStockStates) {
-            state.incrementStockVersion();
-        }
+        inventoryMovementService.incrementStockVersions(lockedStockStates);
 
         entityManager.flush();
 
@@ -388,20 +370,6 @@ public class StockReceiptService {
                 throw new PoLineMismatchException("poLineId must not be set on a direct receipt without poId");
             }
         }
-    }
-
-    private List<SkuStockState> lockOrInitializeStockStates(Set<UUID> sortedSkuIds) {
-        List<SkuStockState> locked = skuStockStateRepository.findBySkuIdInOrderBySkuIdAscForUpdate(sortedSkuIds);
-        if (locked.size() == sortedSkuIds.size()) {
-            return locked;
-        }
-        Set<UUID> existingIds = locked.stream().map(SkuStockState::getSkuId).collect(Collectors.toSet());
-        for (UUID skuId : sortedSkuIds) {
-            if (!existingIds.contains(skuId)) {
-                skuStockStateRepository.saveAndFlush(new SkuStockState(skuId));
-            }
-        }
-        return skuStockStateRepository.findBySkuIdInOrderBySkuIdAscForUpdate(sortedSkuIds);
     }
 
     private Map<String, Object> buildCanonicalRequest(
