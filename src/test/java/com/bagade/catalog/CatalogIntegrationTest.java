@@ -379,9 +379,12 @@ class CatalogIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(3))
                 .andExpect(jsonPath("$.items.length()").value(3))
+                .andExpect(jsonPath("$.items[0].productId").value(silkSareeProd.toString()))
                 .andExpect(jsonPath("$.items[0].productName").value("Banarasi Silk Saree"))
                 .andExpect(jsonPath("$.items[0].sellableQuantity").value(0))
+                .andExpect(jsonPath("$.items[1].productId").value(cottonSareeProd.toString()))
                 .andExpect(jsonPath("$.items[1].productName").value("Bengal Cotton Saree"))
+                .andExpect(jsonPath("$.items[2].productId").value(kanjivaramProd.toString()))
                 .andExpect(jsonPath("$.items[2].productName").value("Gold Zari Kanjivaram"));
 
         // Search q by product name

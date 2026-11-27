@@ -4,6 +4,7 @@ import java.util.UUID;
 
 public record SkuListItemResponse(
         UUID skuId,
+        UUID productId,
         String productName,
         String size,
         String skuCode,

@@ -118,6 +118,7 @@ public class SkuService {
 
         Page<SkuListItemResponse> mappedPage = queryPage.map(row -> new SkuListItemResponse(
                 row.skuId(),
+                row.productId(),
                 row.productName(),
                 row.size(),
                 row.skuCode(),

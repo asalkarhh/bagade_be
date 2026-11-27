@@ -42,7 +42,7 @@ public class SkuSearchRepositoryImpl implements SkuSearchRepository {
 
         String selectJpql = """
                 SELECT new com.bagade.catalog.repository.SkuQueryRow(
-                    s.id, p.name, s.size, s.skuCode, s.defaultSellingPrice, s.active, s.version
+                    s.id, p.id, p.name, s.size, s.skuCode, s.defaultSellingPrice, s.active, s.version
                 )
                 FROM Sku s
                 JOIN s.product p

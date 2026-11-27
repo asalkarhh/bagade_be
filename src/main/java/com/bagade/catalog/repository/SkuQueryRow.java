@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record SkuQueryRow(
         UUID skuId,
+        UUID productId,
         String productName,
         String size,
         String skuCode,
